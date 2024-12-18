@@ -1,5 +1,148 @@
-import { getFieldURL } from './helpers';
+import { getFieldURL, getImageScaleParams } from './helpers';
+import { flattenToAppURL, isInternalURL } from '@plone/volto/helpers';
 
+jest.mock('@plone/volto/helpers', () => ({
+  flattenToAppURL: jest.fn((url) => url),
+  isInternalURL: jest.fn((url) => true),
+}));
+
+describe('getImageScaleParams', () => {
+  it('returns expected image scale URL obj when image_field and image_scales properties are passed', () => {
+    const image = {
+      '@id': 'http://localhost:3000/image',
+      image_field: 'image',
+      image_scales: {
+        image: [
+          {
+            download: '@@images/image.png',
+            width: 400,
+            height: 400,
+            scales: {
+              preview: {
+                download: '@@images/image-400.png',
+                width: 400,
+                height: 400,
+              },
+            },
+          },
+        ],
+      },
+    };
+
+    const expectedUrlObj = {
+      download: 'http://localhost:3000/image/@@images/image-400.png',
+      width: 400,
+      height: 400,
+    };
+    expect(getImageScaleParams(image, 'preview')).toEqual(expectedUrlObj);
+  });
+
+  it('returns expected image scale URL obj when image_field and image_scales properties are passed but with no scales', () => {
+    const image = {
+      '@id': 'http://localhost:3000/image',
+      image_field: 'image',
+      image_scales: {
+        image: [
+          {
+            download: '@@images/image.png',
+            width: 400,
+            height: 400,
+          },
+        ],
+      },
+    };
+
+    const expectedUrlObj = {
+      download: 'http://localhost:3000/image/@@images/image.png',
+      width: 400,
+      height: 400,
+    };
+    expect(getImageScaleParams(image, 'preview')).toEqual(expectedUrlObj);
+  });
+
+  it('returns expected image scale URL obj when image properties are passed', () => {
+    const image = {
+      '@id': 'http://localhost:3000/image',
+      image: {
+        download: 'http://localhost:3000/image/@@images/image.png',
+        width: 400,
+        height: 400,
+        scales: {
+          preview: {
+            download: 'http://localhost:3000/image/@@images/image-400.png',
+            width: 400,
+            height: 400,
+          },
+        },
+      },
+    };
+    const expectedUrlObj = {
+      download: 'http://localhost:3000/image/@@images/image-400.png',
+      width: 400,
+      height: 400,
+    };
+    expect(getImageScaleParams(image, 'preview')).toEqual(expectedUrlObj);
+  });
+
+  it('calls flattenToAppURL when internalUrl', () => {
+    const url = 'http://localhost:3000/image';
+    const size = 'large';
+    getImageScaleParams(url, size);
+    expect(flattenToAppURL).toHaveBeenCalledWith('http://localhost:3000/image');
+  });
+
+  it('returns expected image scale URL string when image url (string) is passed', () => {
+    const image = 'http://localhost:3000/image/@@images/image.png';
+    expect(getImageScaleParams(image, 'preview')).toEqual({
+      download: `${image}/@@images/image/preview`,
+    });
+  });
+
+  it('returns image URL string when external image url (string) is passed', () => {
+    isInternalURL.mockReturnValue(false);
+    const image = 'http://external-url.com';
+    expect(getImageScaleParams(image)).toEqual({
+      download: image,
+    });
+  });
+
+  it('returns image URL string when image url (object) with no scales is passed', () => {
+    isInternalURL.mockReturnValue(true);
+    const image = {
+      '@id': 'http://localhost:3000/image',
+      image: {
+        download: 'http://localhost:3000/image/@@images/image.png',
+        width: 400,
+        height: 400,
+      },
+    };
+    expect(getImageScaleParams(image)).toEqual({
+      download: `${image['@id']}/@@images/image/preview`,
+    });
+  });
+
+  it('returns image URL string when external image url (object) is passed', () => {
+    isInternalURL.mockReturnValue(false);
+    const image = {
+      '@id': 'http://external-url.com',
+      image: {
+        download: 'http://external-url.com',
+        width: 400,
+        height: 400,
+        scales: {
+          preview: {
+            download: 'hhttp://external-url.com',
+            width: 400,
+            height: 400,
+          },
+        },
+      },
+    };
+    expect(getImageScaleParams(image)).toEqual({
+      download: image['@id'],
+    });
+  });
+});
 describe('getFieldURL', () => {
   it('handles a URL type object with type and value', () => {
     const data = {
